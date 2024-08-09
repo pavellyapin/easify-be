@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: chatGPT-POC
+Transform:
+- AWS::Serverless-2016-10-31
+Globals:
+  Function:
+    Tracing: Active
+  Api:
+    Cors:
+      AllowMethods: '''GET,POST,OPTIONS'''
+      AllowHeaders: '''content-type'''
+      AllowOrigin: '''*'''
+Resources:
+  ChatGPTApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: ChatGPTApi
+      StageName: Prod
+  GetChatGPTPromptFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/get-chat-gpt-prompt.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 300
+      Description: A function that returns the response from the chat prompt
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ChatGPTApi
+            Path: /getPrompt
+            Method: POST
+      CodeUri: GetChatGPTPromptFunction
+    Metadata:
+      SamResourceId: GetChatGPTPromptFunction
+  GetDailyScheduleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/get-daily-schedule.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 300
+      Description: A function that returns the daily schedule
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-prompts/prompts.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ChatGPTApi
+            Path: /getDaily
+            Method: POST
+      CodeUri: GetDailyScheduleFunction
+    Metadata:
+      SamResourceId: GetDailyScheduleFunction
+  GenerateCourseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/generate-course.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 300
+      Description: A function that returns a course
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/firebase-account.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-prompts/prompts.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+      Events:
+        SNS:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: ChatGPTSNSTopic
+      CodeUri: GenerateCourseFunction
+    Metadata:
+      SamResourceId: GenerateCourseFunction
+  ChatGPTSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: chatGPT-SNSTopic
+  ApplicationResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name:
+        Fn::Sub: ApplicationInsights-SAM-${AWS::StackName}
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+  ApplicationInsightsMonitoring:
+    Type: AWS::ApplicationInsights::Application
+    Properties:
+      ResourceGroupName:
+        Ref: ApplicationResourceGroup
+      AutoConfigurationEnabled: 'true'
+Outputs:
+  WebEndpoint:
+    Description: API Gateway endpoint URL for Prod stage
+    Value:
+      Fn::Sub: https://${ChatGPTApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/
