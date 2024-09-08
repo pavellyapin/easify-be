@@ -1,0 +1,27 @@
+{
+    "Records": [
+      {
+        "EventSource": "aws:sns",
+        "EventVersion": "1.0",
+        "EventSubscriptionArn": "arn:aws:sns:us-east-1:123456789012:MyTopic:2bcfbf39-05c3-41de-beaa-fcfcc21c8f55",
+        "Sns": {
+          "Type": "Notification",
+          "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+          "TopicArn": "arn:aws:sns:us-east-1:123456789012:MyTopic",
+          "Subject": "TestInvoke",
+          "Message": "{\"workouts\":[{\"name\":\"Mindful Breathing Meditation\"},{\"name\":\"Body Scan Relaxation\"}]}",
+          "Timestamp": "2022-06-25T12:00:00.000Z",
+          "SignatureVersion": "1",
+          "Signature": "EXAMPLE",
+          "SigningCertUrl": "EXAMPLE",
+          "UnsubscribeUrl": "EXAMPLE",
+          "MessageAttributes": {
+            "AttributeKey": {
+              "Type": "String",
+              "Value": "AttributeValue"
+            }
+          }
+        }
+      }
+    ]
+  }

@@ -8,7 +8,7 @@ Globals:
   Api:
     Cors:
       AllowMethods: '''GET,POST,OPTIONS'''
-      AllowHeaders: '''content-type'''
+      AllowHeaders: '''content-type,Authorization'''
       AllowOrigin: '''*'''
 Resources:
   ChatGPTApi:
@@ -19,7 +19,7 @@ Resources:
   GetChatGPTPromptFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handlers/get-chat-gpt-prompt.lambdaHandler
+      Handler: src/handlers/chat/get-chat-gpt-prompt.lambdaHandler
       Runtime: nodejs16.x
       Architectures:
       - x86_64
@@ -51,13 +51,154 @@ Resources:
   GetDailyScheduleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handlers/get-daily-schedule.lambdaHandler
+      Handler: src/handlers/schedule/get-daily-schedule.lambdaHandler
       Runtime: nodejs16.x
       Architectures:
       - x86_64
       MemorySize: 128
       Timeout: 300
       Description: A function that returns the daily schedule
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-prompts/prompts.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/firebase-account.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ChatGPTApi
+            Path: /getDaily
+            Method: POST
+            RequestParameters:
+            - method.request.header.Authorization:true
+      CodeUri: GetDailyScheduleFunction
+    Metadata:
+      SamResourceId: GetDailyScheduleFunction
+  ScanResumeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/growth/scan-resume.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 300
+      Description: A function scans a resume
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/firebase-account.json
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - textract:AnalyzeDocument
+          - textract:DetectDocumentText
+          Resource: '*'
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+          FIREBASE_STORAGE_BUCKET: easify-resumes
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ChatGPTApi
+            Path: /scanResume
+            Method: POST
+            RequestParameters:
+            - method.request.header.Authorization:true
+      CodeUri: ScanResumeFunction
+    Metadata:
+      SamResourceId: ScanResumeFunction
+  analyzeResumeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/growth/analyze-resume.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 300
+      Description: A function analyses a resume
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-prompts/prompts.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/firebase-account.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+          FIREBASE_STORAGE_BUCKET: easify-resumes
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ChatGPTApi
+            Path: /analyzeResume
+            Method: POST
+            RequestParameters:
+            - method.request.header.Authorization:true
+      CodeUri: analyzeResumeFunction
+    Metadata:
+      SamResourceId: analyzeResumeFunction
+  GenerateRecipeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/recipe/generate-recipe.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 300
+      Description: A function that generates new recipe
       Policies:
       - Version: '2012-10-17'
         Statement:
@@ -83,21 +224,49 @@ Resources:
           Properties:
             RestApiId:
               Ref: ChatGPTApi
-            Path: /getDaily
+            Path: /getRecipe
             Method: POST
-      CodeUri: GetDailyScheduleFunction
+      CodeUri: GenerateRecipeFunction
     Metadata:
-      SamResourceId: GetDailyScheduleFunction
-  GenerateCourseFunction:
+      SamResourceId: GenerateRecipeFunction
+  SendShoppingListFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handlers/generate-course.lambdaHandler
+      Handler: src/handlers/shopping/send-shopping-list.lambdaHandler
       Runtime: nodejs16.x
       Architectures:
       - x86_64
       MemorySize: 128
       Timeout: 300
-      Description: A function that returns a course
+      Description: A function that sends a shopping list as a text message
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - SNS:Publish
+          Resource: '*'
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ChatGPTApi
+            Path: /sendShoppingList
+            Method: POST
+      CodeUri: SendShoppingListFunction
+    Metadata:
+      SamResourceId: SendShoppingListFunction
+  GenerateCourseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/courses/generate-course.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 900
+      Description: A function that generates a list of courses
       Policies:
       - Version: '2012-10-17'
         Statement:
@@ -127,14 +296,117 @@ Resources:
           Type: SNS
           Properties:
             Topic:
-              Ref: ChatGPTSNSTopic
+              Ref: CourseTopic
       CodeUri: GenerateCourseFunction
     Metadata:
       SamResourceId: GenerateCourseFunction
-  ChatGPTSNSTopic:
+  GenerateRecipesBatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/recipes/batch-generate-recipe.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 900
+      Description: A function that generates recipes with images
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/firebase-account.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-prompts/prompts.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+          FIREBASE_STORAGE_BUCKET: easify-recipe-images
+      Events:
+        SNS:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: BatchRecipeTopic
+      CodeUri: GenerateRecipesBatchFunction
+    Metadata:
+      SamResourceId: GenerateRecipesBatchFunction
+  GenerateWorkoutsBatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/workouts/batch-generate-workout.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 900
+      Description: A function that generates workouts
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/firebase-account.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-prompts/prompts.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+      Events:
+        SNS:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: BatchWorkoutTopic
+      CodeUri: GenerateWorkoutsBatchFunction
+    Metadata:
+      SamResourceId: GenerateWorkoutsBatchFunction
+  CourseTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: chatGPT-SNSTopic
+      TopicName: chatGPT-CourseSNSTopic
+  BatchRecipeTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: chatGPT-RecipesSNSTopic
+  BatchWorkoutTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: chatGPT-WorkoutsSNSTopic
+  ShoppingListSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ShoppingListSNSTopic
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:
