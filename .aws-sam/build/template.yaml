@@ -52,10 +52,10 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: src/handlers/schedule/get-daily-schedule.lambdaHandler
-      Runtime: nodejs16.x
+      Runtime: nodejs18.x
       Architectures:
       - x86_64
-      MemorySize: 128
+      MemorySize: 512
       Timeout: 300
       Description: A function that returns the daily schedule
       Policies:
@@ -346,6 +346,96 @@ Resources:
       CodeUri: GenerateRecipesBatchFunction
     Metadata:
       SamResourceId: GenerateRecipesBatchFunction
+  GenerateCareersBatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/growth/generate-careers.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 900
+      Description: A function that generates industry with jobs
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/firebase-account.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-prompts/prompts.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+      Events:
+        SNS:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: BatchIndustryTopic
+      CodeUri: GenerateCareersBatchFunction
+    Metadata:
+      SamResourceId: GenerateCareersBatchFunction
+  GenerateFinancialPlansBatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/financial/generate-plans.lambdaHandler
+      Runtime: nodejs18.x
+      Architectures:
+      - x86_64
+      MemorySize: 128
+      Timeout: 900
+      Description: A function that generates financial plans
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/secrets.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-secrets/firebase-account.json
+      - Version: '2012-10-17'
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::easify-prompts/prompts.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+      Events:
+        SNS:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: BatchFinancialPlanTopic
+      CodeUri: GenerateFinancialPlansBatchFunction
+    Metadata:
+      SamResourceId: GenerateFinancialPlansBatchFunction
   GenerateWorkoutsBatchFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -403,10 +493,18 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: chatGPT-WorkoutsSNSTopic
+  BatchIndustryTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: chatGPT-IndustrySNSTopic
   ShoppingListSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: ShoppingListSNSTopic
+  BatchFinancialPlanTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: BatchFinancialPlanSNSTopic
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:

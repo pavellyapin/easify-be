@@ -1,4 +1,5 @@
 const { getDataFromS3, getOpenAIObject, getChatGPTPrompt, sanitizeString } = require('../utils');
+const { HEADERS } = require('../const');
 const admin = require('firebase-admin');
 
 exports.lambdaHandler = async (event) => {
@@ -43,7 +44,7 @@ exports.lambdaHandler = async (event) => {
             const conversationWithWorkoutRequest = [contextMessage, workoutRequestMessage];
 
             console.log('Prepared conversation:', conversationWithWorkoutRequest);
-            const gptResponse = await getChatGPTPrompt(openai, conversationWithWorkoutRequest, 2048,'gpt-3.5-turbo');
+            const gptResponse = await getChatGPTPrompt(openai, conversationWithWorkoutRequest, 2048,'gpt-4o-mini');
             console.log('GPT Response:', gptResponse);
 
             let workout;
@@ -62,22 +63,14 @@ exports.lambdaHandler = async (event) => {
 
         return {
             statusCode: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
-            },
+            headers: HEADERS,
             body: JSON.stringify({ message: 'Workouts processed successfully.' })
         };
     } catch (error) {
         console.error('Error:', error);
         return {
             statusCode: 500,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
-            },
+            headers: HEADERS,
             body: JSON.stringify({ error: error.message })
         };
     }
@@ -86,15 +79,22 @@ exports.lambdaHandler = async (event) => {
 exports.saveWorkoutToFirestore = async (firestore, workout) => {
     console.log('Saving workout to Firestore');
     const workoutsCollection = firestore.collection('workouts');
-    // Normalize the tags to lowercase before saving
-    if (workout.tags && Array.isArray(workout.tags)) {
-        workout.tags = workout.tags.map(tag => tag.toLowerCase());
+  
+    // Check if tags is a string and convert it to an array if necessary
+    if (typeof workout.tags === 'string') {
+      workout.tags = workout.tags.split(',').map(tag => tag.trim().toLowerCase());
+    } else if (Array.isArray(workout.tags)) {
+      // Normalize the tags array to lowercase
+      workout.tags = workout.tags.map(tag => tag.toLowerCase().trim());
     }
+  
     // Add the createdDate field with the current date
     workout.createdDate = new Date().toISOString();
+  
+    // Save the workout to Firestore
     const document = await workoutsCollection.add(workout);
     console.log('Workout successfully saved to Firestore with ID:', document.id);
-};
+  };
 
 // Function to check if a workout with the same name already exists
 const checkIfWorkoutExists = async (firestore, workoutName) => {

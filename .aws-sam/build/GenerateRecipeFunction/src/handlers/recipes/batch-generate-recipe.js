@@ -1,4 +1,5 @@
 const { getDataFromS3, getOpenAIObject, getChatGPTPrompt, generateImageAndSavetoStorage, sanitizeString } = require('../utils');
+const { HEADERS } = require('../const');
 const admin = require('firebase-admin');
 
 exports.lambdaHandler = async (event) => {
@@ -71,22 +72,14 @@ exports.lambdaHandler = async (event) => {
 
         return {
             statusCode: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
-            },
+            headers: HEADERS,
             body: JSON.stringify({ message: 'Recipes processed successfully.' })
         };
     } catch (error) {
         console.error('Error:', error);
         return {
             statusCode: 500,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
-            },
+            headers: HEADERS,
             body: JSON.stringify({ error: error.message })
         };
     }
