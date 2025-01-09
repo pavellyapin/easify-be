@@ -9,7 +9,7 @@
         "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
         "TopicArn": "arn:aws:sns:us-east-1:123456789012:MyTopic",
         "Subject": "TestInvoke",
-        "Message": "{\"industries\": [\"Cloud Computing\"]}",
+        "Message": "{\"count\": 10}",
         "Timestamp": "2022-06-25T12:00:00.000Z",
         "SignatureVersion": "1",
         "Signature": "EXAMPLE",

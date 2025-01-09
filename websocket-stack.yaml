@@ -1,0 +1,317 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: WebSocket API Stack for Easify
+Transform:
+  - AWS::Serverless-2016-10-31
+
+Resources:
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: EasifyWebSocketApi
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  WebSocketConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt WebSocketConnectFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$connect"
+
+  ScanResumePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt ScanResumeFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/scanResume"
+
+  CustomDayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt GetCustomDayFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/getCustomDay"
+
+  DailySchedulePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        Action: lambda:InvokeFunction
+        FunctionName: !GetAtt GetDailyScheduleFunction.Arn
+        Principal: apigateway.amazonaws.com
+        SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/getDaily"
+
+  WebSocketDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt WebSocketDisconnectFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$disconnect"
+
+  WebSocketConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${ConnectIntegration}"
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketConnectFunction.Arn}/invocations
+
+  WebSocketDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${DisconnectIntegration}"
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketDisconnectFunction.Arn}/invocations
+
+  ScanResumeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: scanResume
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${ScanResumeIntegration}"
+
+  ScanResumeIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ScanResumeFunction.Arn}/invocations
+
+  WebSocketConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/websocket/onConnect.lambdaHandler
+      Runtime: nodejs18.x
+      CodeUri: src/handlers/websocket
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 10
+      Description: Handle WebSocket $connect
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+
+  WebSocketDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/websocket/onDisconnect.lambdaHandler
+      Runtime: nodejs18.x
+      CodeUri: src/handlers/websocket
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 10
+      Description: Handle WebSocket $disconnect
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  ScanResumeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/growth/scan-resume/scan-resume.lambdaHandler
+      Runtime: nodejs18.x
+      CodeUri: src/handlers/growth/scan-resume
+      Layers:
+      - !Ref SharedLayer
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Timeout: 30
+      Description: Handle WebSocket messages
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Action: execute-api:ManageConnections
+              Effect: Allow
+              Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/POST/@connections/*"
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: 
+                - arn:aws:s3:::easify-secrets/secrets.json
+                - arn:aws:s3:::easify-prompts/prompts.json
+                - arn:aws:s3:::easify-secrets/firebase-account.json
+            - Action:
+                - textract:AnalyzeDocument
+                - textract:DetectDocumentText
+              Effect: Allow
+              Resource: "*"
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+          FIREBASE_STORAGE_BUCKET: easify-resumes
+
+  GetDailyScheduleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/schedule/get-daily-schedule.lambdaHandler
+      Runtime: nodejs18.x
+      CodeUri: src/handlers/schedule
+      Layers:
+      - !Ref SharedLayer
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Timeout: 300
+      Description: A function that returns the daily schedule
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Action: execute-api:ManageConnections
+              Effect: Allow
+              Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/POST/@connections/*"
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-secrets/secrets.json
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-prompts/prompts.json
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-secrets/firebase-account.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+
+  GetCustomDayFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/schedule/get-custom-day.lambdaHandler
+      Runtime: nodejs18.x
+      CodeUri: src/handlers/schedule
+      Layers:
+      - !Ref SharedLayer
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Timeout: 300
+      Description: A function that returns the custom daily schedule
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Action: execute-api:ManageConnections
+              Effect: Allow
+              Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/POST/@connections/*"
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-secrets/secrets.json
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-prompts/prompts.json
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-secrets/firebase-account.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+
+  DailyScheduleRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: getDaily
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${DailyScheduleIntegration}"
+
+  CustomDayRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: getCustomDay
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${CustomDayIntegration}"
+
+  DailyScheduleIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetDailyScheduleFunction.Arn}/invocations
+
+  CustomDayIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetCustomDayFunction.Arn}/invocations
+
+  SharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: src/handlers/shared
+      CompatibleRuntimes:
+        - nodejs18.x
+
+
+  WebSocketDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    Properties:
+      ApiId: !Ref WebSocketApi
+    DependsOn:
+      - WebSocketConnectRoute
+      - WebSocketDisconnectRoute
+      - ScanResumeRoute
+      - DailyScheduleRoute
+
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      DeploymentId: !Ref WebSocketDeployment
+      StageName: Prod
+
+Outputs:
+  WebSocketEndpoint:
+    Description: WebSocket API Gateway endpoint
+    Value: !Sub "wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
