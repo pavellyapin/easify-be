@@ -10,7 +10,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/courses
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 128
@@ -54,7 +54,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/courses
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 128
@@ -97,7 +97,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/courses
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 128
@@ -140,7 +140,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/recipes
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 128
@@ -183,7 +183,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/growth
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 128
@@ -225,7 +225,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/growth
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 128
@@ -267,7 +267,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/financial
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 128
@@ -302,6 +302,48 @@ Resources:
           Properties:
             Topic: !Ref BatchFinancialPlanTopic
 
+  GeneratePortfoliosBatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/financial/generate-portfolios.lambdaHandler
+      Runtime: nodejs18.x
+      CodeUri: src/handlers/financial
+      Layers:
+        - !ImportValue "chatGPT-POC-SharedLayer"
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 900
+      Description: A function that generates financial portfolios
+      Policies:
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-secrets/secrets.json
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-secrets/firebase-account.json
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-prompts/prompts.json
+      Environment:
+        Variables:
+          SECRETS_S3_BUCKET_NAME: easify-secrets
+          SECRETS_S3_KEY_NAME: secrets.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+      Events:
+        SNS:
+          Type: SNS
+          Properties:
+            Topic: !Ref BatchPortfoliosTopic
+
   GenerateWorkoutsBatchFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -309,7 +351,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/workouts
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 128
@@ -345,13 +387,6 @@ Resources:
           Type: SNS
           Properties:
             Topic: !Ref BatchWorkoutTopic
-
-  SharedLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      ContentUri: src/handlers/shared
-      CompatibleRuntimes:
-        - nodejs18.x
 
   CourseQueueTopic:
     Type: AWS::SNS::Topic
@@ -392,6 +427,11 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: BatchFinancialPlanSNSTopic
+
+  BatchPortfoliosTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: BatchPortfoliosSNSTopic
 
 Outputs:
   CourseTopicArn:

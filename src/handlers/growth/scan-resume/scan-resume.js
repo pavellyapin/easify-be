@@ -6,8 +6,8 @@ const {
   getOpenAIObject,
   getChatGPTPrompt,
   sanitizeString,
-  sendMessage
-} = require('/opt/nodejs/utils');
+  sendMessage,
+} = require("/opt/nodejs/utils");
 const admin = require("firebase-admin");
 const textract = new AWS.Textract();
 

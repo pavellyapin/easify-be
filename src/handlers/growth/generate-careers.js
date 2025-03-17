@@ -3,7 +3,7 @@ const {
   getOpenAIObject,
   getChatGPTPrompt,
   sanitizeString,
-} = require('/opt/nodejs/utils');
+} = require("/opt/nodejs/utils");
 const admin = require("firebase-admin");
 
 exports.lambdaHandler = async (event) => {

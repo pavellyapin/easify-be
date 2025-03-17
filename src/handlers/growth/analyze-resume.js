@@ -4,8 +4,8 @@ const {
   getChatGPTPrompt,
   sanitizeString,
   verifyAndDecodeToken,
-  HEADERS
-} = require('/opt/nodejs/utils');
+  HEADERS,
+} = require("/opt/nodejs/utils");
 const admin = require("firebase-admin");
 
 exports.lambdaHandler = async (event) => {

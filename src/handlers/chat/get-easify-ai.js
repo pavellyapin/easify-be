@@ -6,15 +6,12 @@ const {
   getChatGPTPrompt,
   sanitizeString,
   verifyAndDecodeToken,
-} = require("../utils");
+  HEADERS,
+} = require("/opt/nodejs/utils");
 const admin = require("firebase-admin");
-const { HEADERS } = require("../const");
 
 exports.lambdaHandler = async (event) => {
   try {
-    const startTime = new Date();
-    console.log(`[${startTime.toISOString()}] Start: Received event.`);
-
     const [chatGPTSecret, easifyRequest, serviceAccountKey] = await Promise.all(
       [
         getDataFromS3(
@@ -60,11 +57,13 @@ exports.lambdaHandler = async (event) => {
       course: "courses",
       workout: "workouts",
       recipe: "recipes",
+      portfolio: "portfolios",
+      industry: "industries",
     }[type];
 
     if (!collection) {
       throw new Error(
-        "Invalid type. Must be 'course', 'workout', or 'recipe'.",
+        "Invalid type. Must be 'course', 'workout', or 'recipe', 'portfolio', 'industry'.",
       );
     }
 
@@ -79,11 +78,93 @@ exports.lambdaHandler = async (event) => {
     let description, promptContext;
 
     // Max tokens and model variables
-    const maxTokens = 1500;
-    const model = "gpt-3.5-turbo";
+    let maxTokens = 1500;
+    const model = "gpt-4o-mini";
 
     // Prompt construction based on type
     switch (type) {
+      case "industry":
+        maxTokens = 2000;
+        const part = item.part;
+      
+        let industryFieldMapping = {
+          overview: ["historicalSignificance", "growthRate", "marketSize", "yearStarted"],
+          skillsInDemand: "skillsInDemand",
+          topCompany: "topCompanies",
+          customerBase: "customerBase",
+          geographicalHotspots: "geographicalHotspots",
+          opportunities: "futureOpportunities",
+          notableTechnologies: "notableTechnologies",
+          requiredEducation: "educationalRequirements",
+          workConditions: "workEnvironment",
+          jobProspects: "jobOutlook",
+          majorTrends: "majorTrends",
+          challenges: "challenges",
+        };
+      
+        if (!industryFieldMapping[part]) {
+          throw new Error(`Invalid industry part: ${part}`);
+        }
+      
+        let formattedIndustryData;
+      
+        if (part === "overview") {
+          // ✅ Fetch multiple fields from `detailedInfo`
+          const historicalSignificance = data.detailedInfo?.historicalSignificance || "No historical significance available";
+          const growthRate = data.detailedInfo?.growthRate || "Growth rate not available";
+          const marketSize = data.detailedInfo?.marketSize || "Market size unknown";
+          const yearStarted = data.detailedInfo?.yearStarted ? `Established in ${data.detailedInfo.yearStarted}` : "Year started unknown";
+      
+          formattedIndustryData = `${yearStarted}\nGrowth Rate: ${growthRate}\nMarket Size: ${marketSize}\nHistorical Significance: ${historicalSignificance}`;
+        } else {
+          // ✅ Extract single field normally
+          const industryData = data[industryFieldMapping[part]];
+      
+          formattedIndustryData = Array.isArray(industryData)
+            ? industryData
+                .map((entry) =>
+                  typeof entry === "string"
+                    ? entry
+                    : entry.name
+                      ? `${entry.name}: ${entry.description || ""}`
+                      : entry.description || "",
+                )
+                .join("\n• ")
+            : typeof industryData === "object"
+              ? JSON.stringify(industryData, null, 2)
+              : industryData || "No data available";
+        }
+      
+        // ✅ Custom description for overview
+        description = `Industry Name: ${data.name}\nIndustry Category: ${data.category}\n${part} Information:\n${formattedIndustryData}`;
+      
+        // ✅ Custom promptContext for GPT
+        promptContext = `I am exploring the industry "${data.name}", which falls under "${data.category}". I want to know more about "${part}". Here are the details:\n${formattedIndustryData}.\n${easifyRequest}`;
+      
+        break;
+
+      case "portfolio":
+        maxTokens = 4000;
+        const assetClass = data[item.assetClass];
+        const holding = assetClass[item.holdingIndex];
+        const historicalData = holding.historicalData;
+
+        // Filter out invalid data and extract only close and date
+        const cleanedHistoricalData = historicalData
+          .filter((entry) => entry?.close && entry?.date) // Filter valid entries
+          .map((entry) => ({
+            date: entry.date,
+            close: entry.close.toFixed(2), // Format to 2 decimals
+          }));
+
+        // Convert to a readable string for the prompt
+        const historicalDataText = cleanedHistoricalData
+          .map((entry) => `${entry.date}: $${entry.close}`)
+          .join(", ");
+
+        promptContext = `I am analyzing the portfolio "${data.name}", ${data.description}. In the asset class "${item.assetClass}". The holding "${holding.name}", expand about the company. Historical prices: ${historicalDataText}. ${easifyRequest}`;
+        break;
+
       case "course":
         const chapter = data.chapters?.[item.chapterNumber];
         const topic = chapter?.topics?.[item.topicNumber];
@@ -113,10 +194,6 @@ exports.lambdaHandler = async (event) => {
 
       default:
         throw new Error("Unhandled type in switch case.");
-    }
-
-    if (!description) {
-      throw new Error("Description not found for the specified part.");
     }
 
     const contextMessage = {

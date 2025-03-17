@@ -135,7 +135,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/growth/scan-resume
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 512
@@ -175,7 +175,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/schedule
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 512
@@ -218,7 +218,7 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: src/handlers/schedule
       Layers:
-      - !Ref SharedLayer
+        - !ImportValue "chatGPT-POC-SharedLayer"
       Architectures:
         - x86_64
       MemorySize: 512
@@ -285,14 +285,6 @@ Resources:
       IntegrationType: AWS_PROXY
       IntegrationUri:
         Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetCustomDayFunction.Arn}/invocations
-
-  SharedLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      ContentUri: src/handlers/shared
-      CompatibleRuntimes:
-        - nodejs18.x
-
 
   WebSocketDeployment:
     Type: AWS::ApiGatewayV2::Deployment

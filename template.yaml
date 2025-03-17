@@ -19,6 +19,9 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: src/handlers/chat/get-chat-gpt-prompt.lambdaHandler
+      CodeUri: src/handlers/chat
+      Layers:
+        - !Ref SharedLayer
       Runtime: nodejs18.x
       Architectures:
         - x86_64
@@ -31,10 +34,23 @@ Resources:
             - Action: s3:GetObject
               Effect: Allow
               Resource: arn:aws:s3:::easify-secrets/secrets.json
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-secrets/firebase-account.json
+        - Version: 2012-10-17
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: arn:aws:s3:::easify-prompts/prompts.json
       Environment:
         Variables:
           SECRETS_S3_BUCKET_NAME: easify-secrets
           SECRETS_S3_KEY_NAME: secrets.json
+          PROMPTS_S3_BUCKET_NAME: easify-prompts
+          PROMPTS_S3_KEY_NAME: prompts.json
+          FIREBASE_ACCOUNT_S3_KEY_NAME: firebase-account.json
       Events:
         Api:
           Type: Api
@@ -47,6 +63,9 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: src/handlers/chat/get-easify-ai.lambdaHandler
+      CodeUri: src/handlers/chat
+      Layers:
+        - !Ref SharedLayer
       Runtime: nodejs18.x
       Architectures:
         - x86_64
@@ -188,6 +207,12 @@ Resources:
       TemplateURL: ./sns-stack.yaml
 
 Outputs:
+  SharedLayerExport:
+    Description: ARN of the SharedLayer
+    Value: !Ref SharedLayer
+    Export:
+      Name: !Sub "${AWS::StackName}-SharedLayer"
+
   WebEndpoint:
     Description: API Gateway endpoint URL for Prod stage
     Value: !Sub "https://${ChatGPTApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"

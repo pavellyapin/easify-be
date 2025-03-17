@@ -4,7 +4,7 @@ const {
   getChatGPTPrompt,
   sanitizeString,
   generateImageAndSavetoStorage,
-} = require('/opt/nodejs/utils');
+} = require("/opt/nodejs/utils");
 const admin = require("firebase-admin");
 
 exports.lambdaHandler = async (event) => {
@@ -170,7 +170,7 @@ exports.generateCourseStructure = async (openai, courseName) => {
         role: "user",
         content: `Course name:${courseName} Course overview:${course.overview} chapter title:${chapter.title} chapter sub title:${chapter.subtitle} chapter overview:${chapter.overview}`,
       });
-      const topicPrompt = `Generate interesting content for topic with title ${chapter.topics[j].title} and subtitle ${chapter.topics[j].subtitle}, return in valid json format {title,subtitle,overview,points[{title,desc,content(string)}],quiz}`;
+      const topicPrompt = `Generate interesting content for topic with title ${chapter.topics[j].title} and subtitle ${chapter.topics[j].subtitle}, return in valid json format {title,subtitle,overview,points[{title,desc,content(string)}]}`;
       fullConversation.push({ role: "user", content: topicPrompt });
 
       const topicJson = await getChatGPTPrompt(

@@ -2,7 +2,7 @@ const {
   getDataFromS3,
   getOpenAIObject,
   generateImageAndSavetoStorage,
-} = require('/opt/nodejs/utils');
+} = require("/opt/nodejs/utils");
 const admin = require("firebase-admin");
 
 exports.lambdaHandler = async (event) => {

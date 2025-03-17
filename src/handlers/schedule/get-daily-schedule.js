@@ -5,7 +5,7 @@ const {
   sanitizeString,
   verifyAndDecodeSocketToken,
   sendMessage,
-} = require('/opt/nodejs/utils');
+} = require("/opt/nodejs/utils");
 const admin = require("firebase-admin");
 
 const determineDate = (forTomorrow) => {
@@ -97,6 +97,12 @@ exports.lambdaHandler = async (event) => {
 
     if (wakeUpTime) context += `I usually wake up around ${wakeUpTime}. `;
     if (sleepTime) context += `I usually go to sleep around ${sleepTime}. `;
+    if (userData.basicInfo?.morningGoals) {
+      context += `Some of my morning goals are ${userData.basicInfo?.morningGoals}. `;
+    }
+    if (userData.basicInfo?.eveningGoals) {
+      context += `Some of my evening goals are ${userData.basicInfo?.eveningGoals}. `;
+    }
     // Check dietNutrition map
     if (userData.dietNutrition) {
       const { nutritionCategories, recipeTags } = userData.dietNutrition;
@@ -112,12 +118,9 @@ exports.lambdaHandler = async (event) => {
 
     // Check financialPlanning map
     if (userData.financialPlanning) {
-      const { planCategories, planTags } = userData.financialPlanning;
+      const { planCategories } = userData.financialPlanning;
       if (planCategories && planCategories.length) {
-        context += `I would like to learn and hear advice about ${planCategories.join(", ")}. `;
-      }
-      if (planTags && planTags.length) {
-        context += `Some financial planing topics I am interested in are ${planTags.join(", ")}. `;
+        context += `I would like to learn and hear advice about portfolios of type: ${planCategories.join(", ")}. `;
       }
     }
 
@@ -149,8 +152,8 @@ exports.lambdaHandler = async (event) => {
       if (hybridStatus) {
         if (hybridStatus === "remote") {
           context += `I work remotely. `;
-        } else if (hybridStatus === "in office") {
-          context += `I work in the office. `;
+        } else if (hybridStatus === "in-office") {
+          context += `I work on site. `;
         } else if (hybridStatus === "hybrid") {
           context += `I have a hybrid work schedule, splitting my time between remote work and office. `;
         }
@@ -180,10 +183,8 @@ exports.lambdaHandler = async (event) => {
 
     // Determine which parts of customDayPreferences to use based on the type
     let customDayContext;
-    if (request.type === "firstHalf") {
-      customDayContext = `${customDayPreferences.perfectPerson} ${customDayPreferences.firstHalfScheduleRequest} ${customDayPreferences.scheduleMustsRequest} ${customDayPreferences.jsonStructure}`;
-    } else if (request.type === "secondHalf") {
-      customDayContext = `${customDayPreferences.perfectPerson} ${customDayPreferences.secondHalfScheduleRequest} ${customDayPreferences.scheduleMustsRequest} ${customDayPreferences.jsonStructure}`;
+    if (request.type === "short") {
+      customDayContext = `${customDayPreferences.perfectPerson} ${customDayPreferences.shortScheduleRequest} ${customDayPreferences.scheduleMustsRequest} ${customDayPreferences.jsonStructure}`;
     } else {
       customDayContext = `${customDayPreferences.perfectPerson} ${customDayPreferences.scheduleRequest} ${customDayPreferences.scheduleMustsRequest} ${customDayPreferences.jsonStructure}`;
     }
@@ -285,7 +286,6 @@ exports.lambdaHandler = async (event) => {
       schedule,
     });
     return { statusCode: 200 };
-
   } catch (error) {
     console.error("Error:", error);
     await sendMessage(connectionId, endpoint, {

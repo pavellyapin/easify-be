@@ -3,7 +3,7 @@ const {
   getOpenAIObject,
   getChatGPTPrompt,
   sanitizeString,
-} = require('/opt/nodejs/utils');
+} = require("/opt/nodejs/utils");
 const admin = require("firebase-admin");
 
 exports.lambdaHandler = async (event) => {
@@ -41,9 +41,7 @@ exports.lambdaHandler = async (event) => {
 
     // Fetch all industries from Firestore
     const industriesCollection = firestore.collection("industries");
-    const snapshot = await industriesCollection
-      .where("updatedDate", "==", "")
-      .get();
+    const snapshot = await industriesCollection.get();
 
     if (snapshot.empty) {
       console.log("No industries found in Firestore.");
@@ -52,8 +50,21 @@ exports.lambdaHandler = async (event) => {
 
     console.log(`Found ${snapshot.size} industries in Firestore.`);
 
-    // Loop through each industry in Firestore
-    for (const doc of snapshot.docs) {
+    // Filter documents where updatedDate is null or does not exist
+    const industriesToProcess = snapshot.docs.filter((doc) => {
+      const data = doc.data();
+      return !data.updatedDate || data.updatedDate === null;
+    });
+
+    if (industriesToProcess.length === 0) {
+      console.log("No industries to process.");
+      return;
+    }
+
+    console.log(`Found ${industriesToProcess.length} industries to process.`);
+
+    // Loop through each industry to process
+    for (const doc of industriesToProcess) {
       const industryData = doc.data();
       const industryName = industryData.name;
 
